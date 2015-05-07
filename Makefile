@@ -39,8 +39,8 @@ remduplicates = $(strip $(if $1,$(firstword $1) $(call remduplicates,$(filter-ou
 
 #source common to all targets
 C_SOURCE_FILES += \
-main.c \
-ble_lbs.c \
+src/main.c \
+src/ble_lbs.c \
 $(SDK_PATH)/components/libraries/button/app_button.c \
 $(SDK_PATH)/components/libraries/util/app_error.c \
 $(SDK_PATH)/components/libraries/gpiote/app_gpiote.c \
@@ -62,8 +62,7 @@ $(SDK_PATH)/components/softdevice/common/softdevice_handler/softdevice_handler.c
 ASM_SOURCE_FILES  = $(SDK_PATH)/components/toolchain/gcc/gcc_startup_nrf51.s
 
 #includes common to all targets
-INC_PATHS  = -I./
-INC_PATHS += -I./include
+INC_PATHS  = -I./include
 INC_PATHS += -I$(SDK_PATH)/components/libraries/util
 INC_PATHS += -I$(SDK_PATH)/components/toolchain/gcc
 INC_PATHS += -I$(SDK_PATH)/components/toolchain
