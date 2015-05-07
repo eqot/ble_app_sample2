@@ -24,7 +24,7 @@ void advertising_init(ble_lbs_t *lbs)
     ble_advdata_t scanrsp;
 
     // ble_uuid_t adv_uuids[] = {{LBS_UUID_SERVICE, m_lbs.uuid_type}};
-    ble_uuid_t adv_uuids[] = {{LBS_UUID_SERVICE, lbs->uuid_type}};
+    ble_uuid_t adv_uuids[] = {{UUID_SERVICE, lbs->uuid_type}};
 
     // Build and set advertising data
     memset(&advdata, 0, sizeof(advdata));
