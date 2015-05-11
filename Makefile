@@ -43,6 +43,7 @@ src/main.c \
 src/advertising.c \
 src/gap.c \
 src/ble_lbs.c \
+src/ble_ancs_c.c \
 $(SDK_PATH)/components/libraries/button/app_button.c \
 $(SDK_PATH)/components/libraries/util/app_error.c \
 $(SDK_PATH)/components/libraries/gpiote/app_gpiote.c \
@@ -56,6 +57,7 @@ $(SDK_PATH)/examples/bsp/bsp.c \
 $(SDK_PATH)/components/ble/common/ble_advdata.c \
 $(SDK_PATH)/components/ble/common/ble_conn_params.c \
 $(SDK_PATH)/components/ble/common/ble_srv_common.c \
+$(SDK_PATH)/components/ble/device_manager/device_manager_peripheral.c \
 $(SDK_PATH)/components/ble/ble_debug_assert_handler/ble_debug_assert_handler.c \
 $(SDK_PATH)/components/toolchain/system_nrf51.c \
 $(SDK_PATH)/components/softdevice/common/softdevice_handler/softdevice_handler.c \
@@ -65,10 +67,13 @@ ASM_SOURCE_FILES  = $(SDK_PATH)/components/toolchain/gcc/gcc_startup_nrf51.s
 
 #includes common to all targets
 INC_PATHS  = -I./include
+INC_PATHS += -I./config
 INC_PATHS += -I$(SDK_PATH)/components/libraries/util
+INC_PATHS += -I$(SDK_PATH)/components/libraries/trace
 INC_PATHS += -I$(SDK_PATH)/components/toolchain/gcc
 INC_PATHS += -I$(SDK_PATH)/components/toolchain
 INC_PATHS += -I$(SDK_PATH)/components/ble/common
+INC_PATHS += -I$(SDK_PATH)/components/ble/device_manager
 INC_PATHS += -I$(SDK_PATH)/components/ble/ble_error_log
 INC_PATHS += -I$(SDK_PATH)/components/libraries/scheduler
 INC_PATHS += -I$(SDK_PATH)/components/libraries/gpiote

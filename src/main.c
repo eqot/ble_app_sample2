@@ -33,9 +33,11 @@
 #include "ble_lbs.h"
 #include "bsp.h"
 #include "ble_gap.h"
+#include "device_manager.h"
 
 #include "advertising.h"
 #include "gap.h"
+#include "ble_ancs_c.h"
 
 #define IS_SRVC_CHANGED_CHARACT_PRESENT 0                                           /**< Include or not the service_changed characteristic. if not enabled, the server's database cannot be changed for the lifetime of the device*/
 
@@ -74,6 +76,46 @@ static ble_lbs_t                        m_lbs;
 
 #define SCHED_MAX_EVENT_DATA_SIZE       sizeof(app_timer_event_t)                   /**< Maximum size of scheduler events. Note that scheduler BLE stack events do not contain any data, as the events are being pulled from the stack in the event handler. */
 #define SCHED_QUEUE_SIZE                10                                          /**< Maximum number of events in the scheduler queue. */
+
+
+#define BOND_DELETE_ALL_WAKEUP_BUTTON_ID 0                                                   /**< Button used for deleting all bonded masters/services during startup and to wake up */
+#define DISPLAY_BUFFER_SIZE             ANCS_ATTRIBUTE_DATA_MAX                              /**< Size of LCD display buffer */
+#define MESSAGE_BUFFER_SIZE             18                                                   /**< Size of buffer holding optional messages in notifications. */
+
+static const char *lit_catid[] =
+{
+    "Other",
+    "IncomingCall",
+    "MissedCall",
+    "VoiceMail",
+    "Social",
+    "Schedule",
+    "Email",
+    "News",
+    "HealthAndFitness",
+    "BusinessAndFinance",
+    "Location",
+    "Entertainment"
+};
+
+static const char *lit_eventid[] =
+{
+    "Added",
+    "Modified",
+    "Removed"
+};
+
+
+static ble_ancs_c_t                     m_ancs_c;                                            /**< Structure used to identify the Apple Notification Service Client. */
+static uint8_t                          m_apple_message_buffer[MESSAGE_BUFFER_SIZE];         /**< Message buffer for optional notify messages. */
+
+static char                             display_title[DISPLAY_BUFFER_SIZE];
+static char                             display_message[DISPLAY_BUFFER_SIZE];
+static uint8_t                          m_ancs_uuid_type;
+// static dm_application_instance_t        m_app_handle;                                        /**< Application identifier allocated by device manager. */
+static dm_handle_t                      m_peer_handle;                                       /**< Identifes the peer that is currently connected. */
+
+
 
 // Persistent storage system event handler
 void pstorage_sys_event_handler (uint32_t p_evt);
@@ -155,6 +197,112 @@ static void led_write_handler(ble_lbs_t * p_lbs, uint8_t led_state)
     }
 }
 
+
+void evt_ios_notification(ble_ancs_c_evt_ios_notification_t *p_notice)
+{
+    char buffer[DISPLAY_BUFFER_SIZE];
+
+    printf("Category: %s\n",lit_catid[p_notice->category_id]);
+
+    sprintf(buffer, "%s %02x%02x%02x%02x",
+        lit_eventid[p_notice->event_id],
+        p_notice->notification_uid[0], p_notice->notification_uid[1],
+        p_notice->notification_uid[2], p_notice->notification_uid[3]);
+
+    printf("Notification: %s\n",buffer);
+}
+
+
+void evt_notif_attribute(ble_ancs_c_evt_notif_attribute_t *p_attr)
+{
+    if (p_attr->attribute_id == BLE_ANCS_NOTIFICATION_ATTRIBUTE_ID_TITLE)
+    {
+        memcpy(display_title, p_attr->data, p_attr->attribute_len);
+    }
+    else if (p_attr->attribute_id == BLE_ANCS_NOTIFICATION_ATTRIBUTE_ID_MESSAGE)
+    {
+        memcpy(display_message, p_attr->data, p_attr->attribute_len);
+    }
+}
+
+
+void on_ancs_c_evt(ble_ancs_c_evt_t * p_evt)
+{
+    uint32_t err_code = NRF_SUCCESS;
+
+    switch (p_evt->evt_type)
+    {
+        case BLE_ANCS_C_EVT_DISCOVER_COMPLETE:
+            err_code = dm_security_setup_req(&m_peer_handle);
+            APP_ERROR_CHECK(err_code);
+            break;
+
+        case BLE_ANCS_C_EVT_IOS_NOTIFICATION:
+            evt_ios_notification(&p_evt->data.notification);
+            break;
+
+        case BLE_ANCS_C_EVT_NOTIF_ATTRIBUTE:
+            evt_notif_attribute(&p_evt->data.attribute);
+            break;
+
+        default:
+            //No implementation needed
+            break;
+    }
+}
+
+
+void apple_notification_error_handler(uint32_t nrf_error)
+{
+    APP_ERROR_HANDLER(nrf_error);
+}
+
+
+void service_add(void)
+{
+    ble_ancs_c_init_t ancs_init_obj;
+    ble_uuid_t        service_uuid;
+    uint32_t          err_code;
+    bool              services_delete;
+
+    err_code = sd_ble_uuid_vs_add(&ble_ancs_base_uuid128, &m_ancs_uuid_type);
+    APP_ERROR_CHECK(err_code);
+
+    err_code = sd_ble_uuid_vs_add(&ble_ancs_cp_base_uuid128, &service_uuid.type);
+    APP_ERROR_CHECK(err_code);
+
+    err_code = sd_ble_uuid_vs_add(&ble_ancs_ns_base_uuid128, &service_uuid.type);
+    APP_ERROR_CHECK(err_code);
+
+    err_code = sd_ble_uuid_vs_add(&ble_ancs_ds_base_uuid128, &service_uuid.type);
+    APP_ERROR_CHECK(err_code);
+
+    memset(&ancs_init_obj, 0, sizeof(ancs_init_obj));
+    memset(m_apple_message_buffer, 0, MESSAGE_BUFFER_SIZE);
+
+    ancs_init_obj.evt_handler         = on_ancs_c_evt;
+    ancs_init_obj.message_buffer_size = MESSAGE_BUFFER_SIZE;
+    ancs_init_obj.p_message_buffer    = m_apple_message_buffer;
+    ancs_init_obj.error_handler       = apple_notification_error_handler;
+
+    err_code = ble_ancs_c_init(&m_ancs_c, &ancs_init_obj);
+    APP_ERROR_CHECK(err_code);
+
+    // Clear all discovered and stored services if the  "delete all bonds" button is pushed.
+    err_code = bsp_button_is_pressed(BOND_DELETE_ALL_WAKEUP_BUTTON_ID,&(services_delete));
+    APP_ERROR_CHECK(err_code);
+
+    if (services_delete)
+    {
+        err_code = ble_ans_c_service_delete();
+        APP_ERROR_CHECK(err_code);
+    }
+
+    err_code = ble_ans_c_service_load(&m_ancs_c);
+    APP_ERROR_CHECK(err_code);
+}
+
+
 /**@brief Function for initializing services that will be used by the application.
  */
 static void services_init(void)
@@ -166,6 +314,9 @@ static void services_init(void)
 
     err_code = ble_lbs_init(&m_lbs, &init);
     APP_ERROR_CHECK(err_code);
+
+
+    service_add();
 }
 
 
