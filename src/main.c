@@ -41,9 +41,9 @@
 
 #define WAKEUP_BUTTON_PIN               BSP_BUTTON_0                                /**< Button used to wake up the application. */
 
-#define CONNECTED_LED_PIN_NO            BSP_LED_1                                   /**< Is on when device has connected. */
+#define CONNECTED_LED_PIN_NO            BSP_LED_0                                   /**< Is on when device has connected. */
 
-#define LEDBUTTON_LED_PIN_NO            BSP_LED_0
+#define LEDBUTTON_LED_PIN_NO            BSP_LED_1
 #define LEDBUTTON_BUTTON_PIN_NO         BSP_BUTTON_1
 
 #define APP_TIMER_PRESCALER             0                                           /**< Value of the RTC1 PRESCALER register. */
